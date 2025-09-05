@@ -36,7 +36,6 @@ def _build_context(hits):
     ctx = []
     for h in hits:
         title = h["meta"]["title"]
-        print(title)
         url   = h["meta"]["url"]
         ctx.append(
             f"Titel: {title}\nURL: {url}\nText:\n{h['doc']}\n---"
