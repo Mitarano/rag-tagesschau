@@ -6,7 +6,7 @@
 - Modelle (einmalig laden):
   ```bash
   ollama pull bge-m3      # Embedding
-  ollama pull qwen3:8b    # Chat (alternativ: llama3:8b)
+  ollama pull qwen3:8b    # Chat
   ```
 - Python-Pakete:
   ```bash
