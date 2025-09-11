@@ -1,11 +1,17 @@
+import os
 import sys
 import argparse
 import chromadb, ollama
+from dotenv import load_dotenv
+from openai import OpenAI
 
 CHROMA_DIR = "chroma_tagesschau"
 COLL_NAME  = "tagesschau"
-CHAT_MODEL = "qwen3:8b"
+CHAT_MODEL = "gpt-4.1"
 EMB_MODEL  = "bge-m3"
+
+load_dotenv(override=True)
+oai = OpenAI()
 
 client = chromadb.PersistentClient(path=CHROMA_DIR)
 coll = client.get_or_create_collection(COLL_NAME)
@@ -47,7 +53,7 @@ def _build_context(hits):
     return "\n\n".join(ctx)
 
 
-def generate(query: str, hits, stream: bool = False, think: bool = False):
+def generate(query: str, hits, stream: bool = False):
     if not hits:
         return "Keine passenden Artikel."
 
@@ -58,47 +64,33 @@ def generate(query: str, hits, stream: bool = False, think: bool = False):
         "Wenn die Frage nicht auf Basis dieser Dokumente beantwortet werden kann, "
         "sage dies ausdrücklich."
     )
-
+    
     user = (
         f"Dokumente:\n{context}\n\n"
         f"Frage: {query}\n\n"
         f"Antworte kurz (3-5 Sätze) und nenne die Quellen (Titel und vollständige URL)."
     )
+    inputs = [
+        {"role": "system", "content": [{"type": "input_text", "text": system}]},
+        {"role": "user",   "content": [{"type": "input_text", "text": user}]},
+    ]
 
     if stream:
-        stream_iter = ollama.chat(
-            model=CHAT_MODEL,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user}
-            ],
-            stream=True,
-            think=think
-        )
+        with oai.responses.stream(model=CHAT_MODEL, input=inputs) as s:
+            try:
+                for event in s:
+                    if event.type == "response.output_text.delta":
+                        print(event.delta, end="", flush=True)
 
-        try:
-            for chunk in stream_iter:
-                part = chunk.get("message", {}).get("content", "")
-                if part:
-                    print(part, end="", flush=True)
+                print()
 
-            print()
-
-        except KeyboardInterrupt:
-            print("\n[abgebrochen]")
+            except KeyboardInterrupt:
+                print("\n[abgebrochen]")
 
         return None
 
-    resp = ollama.chat(
-        model=CHAT_MODEL,
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": user}
-        ],
-        think=think
-    )
-
-    print(resp["message"]["content"])
+    resp = oai.responses.create(model=CHAT_MODEL, input=inputs)
+    print(resp.output_text)
 
 
 def answer(query: str, k: int = 4):
